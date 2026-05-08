@@ -8,10 +8,12 @@ import datetime
 @parameters([Property.Number(label = "P", configurable = True, description="P Value of PID"),
              Property.Number(label = "I", configurable = True, description="I Value of PID"),
              Property.Number(label = "D", configurable = True, description="D Value of PID"),
-             Property.Select(label="SampleTime", options=[2,5], description="PID Sample time in seconds. Default: 5 (How often is the output calculation done)"),
+             Property.Select(label = "SampleTime", options=[2,5], description="PID Sample time in seconds. Default: 5 (How often is the output calculation done)"),
              Property.Number(label = "Max_Output", configurable = True, description="Power before Boil threshold is reached."),
+             Property.Number(label = "PID_DuringBoil", options=["Yes", "No"], description="When Boil_Threshold temperature is reached, use PID or use Max_Boil_Output"),
              Property.Number(label = "Boil_Threshold", configurable = True, description="When this temperature is reached, power will be set to Max Boil Output (default: 98 °C/208 F)"),
              Property.Number(label = "Max_Boil_Output", configurable = True, default_value = 85, description="Power when Boil Threshold is reached.")])
+             
 
 class PIDBoil(CBPiKettleLogic):
 
@@ -36,6 +38,8 @@ class PIDBoil(CBPiKettleLogic):
             self.heater = self.kettle.heater
             heat_percent_old = maxout
             self.heater_actor = self.cbpi.actor.find_by_id(self.heater)
+            pid_buring_boil = bool(str(self.props.get("PID_DuringBoil", "No")).strip().lower() == "yes")
+
                        
             await self.actor_on(self.heater, maxout)
 
@@ -45,8 +49,15 @@ class PIDBoil(CBPiKettleLogic):
                 current_kettle_power= self.heater_actor.power
                 sensor_value = current_temp = self.get_sensor_value(self.kettle.sensor).get("value")
                 target_temp = self.get_kettle_target_temp(self.id)
-                if current_temp >= float(maxtempboil):
+                if target_temp >= float(boilthreshold) and current_temp < float(boilthreshold):
+                    heat_percent = maxout
+                elif target_temp >= float(boilthreshold) and current_temp >= float(maxtempboil) and pid_buring_boil == False:
                     heat_percent = maxboilout
+                elif target_temp >= float(boilthreshold) and current_temp >= float(maxtempboil) and pid_buring_boil == True:
+                    heat_percent = pid.calc(sensor_value, target_temp)
+                elif target_temp < float(boilthreshold):
+                    heat_percent = pid.calc(sensor_value, target_temp)
+                # default should not be used as all case are define before
                 else:
                     heat_percent = pid.calc(sensor_value, target_temp)
 
@@ -59,7 +70,7 @@ class PIDBoil(CBPiKettleLogic):
         except asyncio.CancelledError as e:
             pass
         except Exception as e:
-            logging.error("BM_PIDSmartBoilWithPump Error {}".format(e))
+            logging.error("PIDBoil Error {}".format(e))
         finally:
             self.running = False
             await self.actor_off(self.heater)

@@ -24,11 +24,13 @@ Please have a look at the [Craftbeerpi4 Documentation](https://openbrewing.gitbo
 - D - derivative value
 - SampleTime - 2 or 5 seconds -> how often the logic calculates the power setting
 - max output - heater power which is set above boil threshold
-- Boil Threshold - Above this temperature the heater will be set to Max Boil Output Power (default: 98°C / 208F)
+- Boil Threshold - Above this temperature and if Target temperature is set over Threshold the heater will be set to Max Boil Output Power (default: 98°C / 208F) else PID is used
 - Max Boil Output - Power (%) that is used above Boil Threshold Temperature (default: 100%)
+- PID_DuringBoil - When the boil threshold is active: No (default): fixed at Max_Boil_Output / Yes: handed to the PID controller
 
 ### Changelog
 
+- 08.05.26: (0.0.10) Bug Fix — Incorrect boil threshold condition / New Feature — PID_DuringBoil parameter
 - 29.12.22: (0.0.9) Fixed Bug related to Boil Threshold Parameter
 - 10.05.22: (0.0.8) Updated README (removed cbpi add)
 - 10.05.22: (0.0.7) Removed cbpi dependency
