@@ -11,7 +11,7 @@ Once the boil threshold temperature is reached, the boil will be done with the m
 Please have a look at the [Craftbeerpi4 Documentation](https://openbrewing.gitbook.io/craftbeerpi4_support/readme/plugin-installation)
 
 - Package name: cbpi4-PIDBoil
-- Package link: https://github.com/daGrumpf-bxp/cbpi4-PIDBoil/archive/main.zip
+- Package link: https://github.com/PiBrewing/cbpi4-pidboil/archive/main.zip
 
 ### Parameters
 
