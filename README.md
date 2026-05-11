@@ -14,6 +14,7 @@ Please have a look at the [Craftbeerpi4 Documentation](https://openbrewing.gitbo
 - Package link: https://github.com/PiBrewing/cbpi4-pidboil/archive/main.zip
 
 ### Parameters
+![PIDBoil Settings](https://github.com/avollkopf/cbpi4-PIDBoil/blob/main/cbpi4-PIDBoil-logic.png?raw=true)
 
 - P - proportional value
 - I - integral value
