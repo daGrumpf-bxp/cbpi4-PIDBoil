@@ -7,17 +7,17 @@ with open(path.join(this_directory, 'README.md'), encoding='utf-8') as f:
     long_description = f.read()
 
 setup(name='cbpi4-PIDBoil',
-      version='0.0.10',
+      version='0.0.18',
       description='CraftBeerPi4 PID Kettle Control Plugin',
       author='Alexander Vollkopf',
       author_email='avollkopf@web.de',
-      url='https://github.com/avollkopf/cbpi4-PIDBoil',
+      url='https://github.com/daGrumpf-bxp/cbpi4-PIDBoil',
       include_package_data=True,
       package_data={
-        # If any package contains *.txt or *.rst files, include them:
-      '': ['*.txt', '*.rst', '*.yaml'],
-      'cbpi4-PIDBoil': ['*','*.txt', '*.rst', '*.yaml']},
+          # If any package contains *.txt or *.rst files, include them:
+          '': ['*.txt', '*.rst', '*.yaml'],
+          'cbpi4-PIDBoil': ['*', '*.txt', '*.rst', '*.yaml']},
       packages=['cbpi4-PIDBoil'],
-	  long_description=long_description,
-	  long_description_content_type='text/markdown'
-     )
+      long_description=long_description,
+      long_description_content_type='text/markdown'
+      )

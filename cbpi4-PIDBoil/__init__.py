@@ -5,18 +5,18 @@ from cbpi.api import *
 import time
 import datetime
 
+logger = logging.getLogger(__name__)
+
 @parameters([Property.Number(label = "P", configurable = True, description="P Value of PID"),
              Property.Number(label = "I", configurable = True, description="I Value of PID"),
              Property.Number(label = "D", configurable = True, description="D Value of PID"),
              Property.Select(label = "SampleTime", options=[2,5], description="PID Sample time in seconds. Default: 5 (How often is the output calculation done)"),
              Property.Number(label = "Max_Output", configurable = True, description="Power before Boil threshold is reached."),
-             Property.Number(label = "PID_DuringBoil", options=["Yes", "No"], description="When Boil_Threshold temperature is reached, use PID or use Max_Boil_Output"),
+             Property.Select(label = "PID_DuringBoil", options=["Yes", "No"], description="When Boil_Threshold temperature is reached, use PID or use Max_Boil_Output. Default: No"),
              Property.Number(label = "Boil_Threshold", configurable = True, description="When this temperature is reached, power will be set to Max Boil Output (default: 98 °C/208 F)"),
              Property.Number(label = "Max_Boil_Output", configurable = True, default_value = 85, description="Power when Boil Threshold is reached.")])
-             
 
 class PIDBoil(CBPiKettleLogic):
-
 
     async def on_stop(self):
         await self.actor_off(self.heater)
@@ -25,55 +25,76 @@ class PIDBoil(CBPiKettleLogic):
     async def run(self):
         try:
             self.TEMP_UNIT = self.get_config_value("TEMP_UNIT", "C")
-            wait_time = sampleTime = int(self.props.get("SampleTime",5))
-            boilthreshold = 98 if self.TEMP_UNIT == "C" else 208
+            wait_time = sampleTime = int(self.props.get("SampleTime", 5))
+            boilthreshold = float(self.props.get("Boil_Threshold")) if self.props.get("Boil_Threshold") else (98.0 if self.TEMP_UNIT == "C" else 208.0)
 
             p = float(self.props.get("P", 117.0795))
             i = float(self.props.get("I", 0.2747))
             d = float(self.props.get("D", 41.58))
             maxout = int(self.props.get("Max_Output", 100))
-            maxtempboil = float(self.props.get("Boil_Threshold", boilthreshold))
             maxboilout = int(self.props.get("Max_Boil_Output", 100))
             self.kettle = self.get_kettle(self.id)
             self.heater = self.kettle.heater
-            heat_percent_old = maxout
+            # -1 forces actor_set_power on first loop iteration regardless of calculated value
+            heat_percent_old = -1
             self.heater_actor = self.cbpi.actor.find_by_id(self.heater)
-            pid_buring_boil = bool(str(self.props.get("PID_DuringBoil", "No")).strip().lower() == "yes")
+            pid_during_boil = bool(str(self.props.get("PID_DuringBoil", "No")).strip().lower() == "yes")
 
-                       
-            await self.actor_on(self.heater, maxout)
+            logger.info("PIDBoil starting | P={} I={} D={} sampleTime={}s maxout={} boilthreshold={}° maxboilout={} pid_during_boil={}".format(
+                p, i, d, sampleTime, maxout, boilthreshold, maxboilout, pid_during_boil))
+
+            # actor_on removed — power is now set exclusively by the control loop
+            await self.actor_on(self.heater, 0)
 
             pid = PIDArduino(sampleTime, p, i, d, 0, maxout)
 
+            last_mode = None
+            last_heat_percent = None
+            loop_count = 0
+
             while self.running == True:
-                current_kettle_power= self.heater_actor.power
+                current_kettle_power = self.heater_actor.power
                 sensor_value = current_temp = self.get_sensor_value(self.kettle.sensor).get("value")
                 target_temp = self.get_kettle_target_temp(self.id)
-                if target_temp >= float(boilthreshold) and current_temp < float(boilthreshold):
+
+                if target_temp >= boilthreshold and current_temp < boilthreshold:
                     heat_percent = maxout
-                elif target_temp >= float(boilthreshold) and current_temp >= float(maxtempboil) and pid_buring_boil == False:
+                    mode = "HEADING_TO_BOIL (maxout)"
+                elif target_temp >= boilthreshold and current_temp >= boilthreshold and pid_during_boil == False:
                     heat_percent = maxboilout
-                elif target_temp >= float(boilthreshold) and current_temp >= float(maxtempboil) and pid_buring_boil == True:
+                    mode = "BOILING_FIXED (maxboilout)"
+                elif target_temp >= boilthreshold and current_temp >= boilthreshold and pid_during_boil == True:
                     heat_percent = pid.calc(sensor_value, target_temp)
-                elif target_temp < float(boilthreshold):
+                    mode = "BOILING_PID"
+                elif target_temp < boilthreshold:
                     heat_percent = pid.calc(sensor_value, target_temp)
-                # default should not be used as all case are define before
+                    mode = "MASH_PID"
                 else:
                     heat_percent = pid.calc(sensor_value, target_temp)
+                    mode = "ELSE_FALLBACK (should not happen!)"
 
-                
+                loop_count += 1
+                if mode != last_mode or round(heat_percent) != last_heat_percent or loop_count % 10 == 0:
+                    logger.info("PIDBoil | mode={} | target={:.2f}° | current={:.2f}° | heat_percent={:.1f}% | current_kettle_power={} | power_update={}".format(
+                        mode, target_temp, current_temp, heat_percent, current_kettle_power,
+                        (heat_percent_old != heat_percent) or (heat_percent != current_kettle_power)
+                    ))
+                    last_mode = mode
+                    last_heat_percent = round(heat_percent)
+
                 if (heat_percent_old != heat_percent) or (heat_percent != current_kettle_power):
                     await self.actor_set_power(self.heater, heat_percent)
-                    heat_percent_old= heat_percent
+                    heat_percent_old = heat_percent
                 await asyncio.sleep(sampleTime)
 
         except asyncio.CancelledError as e:
             pass
         except Exception as e:
-            logging.error("PIDBoil Error {}".format(e))
+            logger.error("PIDBoil Error {}".format(e))
         finally:
             self.running = False
             await self.actor_off(self.heater)
+
 
 # Based on Arduino PID Library
 # See https://github.com/br3ttb/Arduino-PID-Library
@@ -148,14 +169,13 @@ class PIDArduino(object):
     def _currentTimeMs(self):
         return time.time() * 1000
 
+
 def setup(cbpi):
-
     '''
-    This method is called by the server during startup 
+    This method is called by the server during startup
     Here you need to register your plugins at the server
-    
-    :param cbpi: the cbpi core 
-    :return: 
-    '''
 
+    :param cbpi: the cbpi core
+    :return:
+    '''
     cbpi.plugin.register("PIDBoil", PIDBoil)
