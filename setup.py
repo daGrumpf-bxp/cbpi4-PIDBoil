@@ -11,7 +11,7 @@ setup(name='cbpi4-PIDBoil',
       description='CraftBeerPi4 PID Kettle Control Plugin',
       author='Alexander Vollkopf',
       author_email='avollkopf@web.de',
-      url='https://github.com/daGrumpf-bxp/cbpi4-PIDBoil',
+      url='https://github.com/avollkopf/cbpi4-PIDBoil',
       include_package_data=True,
       package_data={
           # If any package contains *.txt or *.rst files, include them:
