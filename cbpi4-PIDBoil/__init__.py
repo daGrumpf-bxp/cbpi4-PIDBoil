@@ -43,8 +43,9 @@ class PIDBoil(CBPiKettleLogic):
             logger.info("PIDBoil starting | P={} I={} D={} sampleTime={}s maxout={} boilthreshold={}° maxboilout={} pid_during_boil={}".format(
                 p, i, d, sampleTime, maxout, boilthreshold, maxboilout, pid_during_boil))
 
-            # actor_on removed — power is now set exclusively by the control loop
-            await self.actor_on(self.heater, 0)
+            # the heater is switched on by the control loop only when heat_percent > 0:
+            # actor_on(heater, 0) drove the GPIO high until the actor's PWM loop caught up,
+            # and left the heater "on" at 0 % (shown as heating, triggers dependent actors)
 
             pid = PIDArduino(sampleTime, p, i, d, 0, maxout)
 
@@ -82,7 +83,15 @@ class PIDBoil(CBPiKettleLogic):
                     last_mode = mode
                     last_heat_percent = round(heat_percent)
 
-                if (heat_percent_old != heat_percent) or (heat_percent != current_kettle_power):
+                heater_on = self.get_actor_state(self.heater)
+                if heat_percent > 0 and not heater_on:
+                    await self.actor_on(self.heater, heat_percent)
+                    heat_percent_old = heat_percent
+                elif heat_percent <= 0 and heater_on:
+                    await self.actor_off(self.heater)
+                    await self.actor_set_power(self.heater, 0)
+                    heat_percent_old = heat_percent
+                elif (heat_percent_old != heat_percent) or (heat_percent != current_kettle_power):
                     await self.actor_set_power(self.heater, heat_percent)
                     heat_percent_old = heat_percent
                 await asyncio.sleep(sampleTime)
