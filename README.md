@@ -27,6 +27,7 @@ Please have a look at the [Craftbeerpi4 Documentation](https://openbrewing.gitbo
 
 ### Changelog
 
+- 25.09.26: (0.0.19) The heater is switched on only when the PID asks for power, and off when it drops to 0. Before, starting the logic switched the heater on at 0 %: the GPIO went high for up to a second, the heater showed as on and actors depending on it (e.g. a conditional fan) switched on, even with target 0.
 - 11.05.26: (0.0.18) Lower log level from `warning` to `info` for normal lifecycle messages (start, mode/power changes). Set CBPi log level to `INFO` if you want to see them.
 - 08.05.26: (0.0.17) Fix actor_on removed before loop — heater now started at 0% and power set exclusively by control logic on first iteration; fix heat_percent_old initialized to -1 to force first power update
 - 08.05.26: (0.0.14) Fix `Boil_Threshold` GUI value not used in control logic (hardcoded 98°C was used instead); smart logging — log only on mode/power change or every 10 iterations
